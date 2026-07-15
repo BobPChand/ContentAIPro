@@ -49,6 +49,22 @@ export default function PaywallScreen() {
     }
   };
 
+  const handleRestore = async () => {
+    try {
+      const Purchases = require('react-native-purchases').default;
+      const info = await Purchases.restorePurchases();
+      if (Object.keys(info.entitlements.active).length > 0) {
+        await setSubscribed(true);
+        setSubStatus(true);
+        Alert.alert('Restored!', 'Your subscription has been restored.');
+      } else {
+        Alert.alert('Nothing to restore', 'No active subscription found.');
+      }
+    } catch(e) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
   const handleSubscribeIOS = async (planId) => {
     setLoading(true);
     try {
@@ -224,6 +240,10 @@ export default function PaywallScreen() {
           Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel subscriptions in your Apple ID Account Settings.
         </Text>
 
+        <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
+          <Text style={styles.restoreBtnText}>Restore Purchases</Text>
+        </TouchableOpacity>
+
         <View style={styles.trustRow}>
           <Ionicons name="lock-closed" size={14} color="#999" />
           <Text style={styles.trustText}>Cancel anytime · Secure payment</Text>
@@ -256,6 +276,8 @@ const styles = StyleSheet.create({
   subscribeBtnSecondary: { backgroundColor: THEME_LIGHT },
   subscribeBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
   legalText: { fontSize: 11, color: '#999', textAlign: 'center', marginHorizontal: 24, marginTop: 20, lineHeight: 16 },
+  restoreBtn: { marginTop: 16, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  restoreBtnText: { color: '#7C3AED', fontWeight: '600', fontSize: 14 },
   trustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 },
   trustText: { fontSize: 13, color: '#999' },
   subscribedView: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
