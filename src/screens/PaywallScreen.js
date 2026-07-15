@@ -1,83 +1,156 @@
 import * as React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from 'react-native-vector-icons';
-import { startSubscription, isSubscribed, setSubscribed, getUserEmail, setUserEmail, PAYMENT_LINKS } from '../services/ApiService';
+import { isSubscribed, setSubscribed } from '../services/ApiService';
+
+// NOTE ON APPLE COMPLIANCE (Guideline 3.1.1):
+// On iOS, subscriptions MUST go through Apple's native In-App Purchase (StoreKit),
+// not an external payment link. This screen routes iOS purchases through RevenueCat.
+// Web and Android continue to use Stripe Checkout directly.
+
+const REVENUECAT_IOS_KEY = 'appl_xxxxxxxxxxxxxxxxxxx'; // TODO: Replace with your RevenueCat iOS public key
 
 const THEME = '#7C3AED';
 const THEME_LIGHT = '#F3EEFF';
 
+// RevenueCat package identifiers - must match App Store Connect & RevenueCat dashboard
+const RC_MONTHLY_ID = '$rc_monthly';
+const RC_ANNUAL_ID = '$rc_annual';
+const RC_AGENCY_ID = 'agency';
+
 export default function PaywallScreen() {
   const [subscribed, setSubStatus] = React.useState(false);
-  const [email, setEmail] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [packages, setPackages] = React.useState([]);
 
   React.useEffect(() => {
     checkStatus();
+    if (Platform.OS === 'ios') {
+      initRevenueCat();
+    }
   }, []);
 
   const checkStatus = async () => {
     const sub = await isSubscribed();
     setSubStatus(sub);
-    const savedEmail = await getUserEmail();
-    if (savedEmail) setEmail(savedEmail);
   };
 
-  const handleSubscribe = async (plan) => {
-    if (!email.trim()) {
-      Alert.alert('Email required', 'Enter your email to start your free trial.');
-      return;
+  const initRevenueCat = async () => {
+    try {
+      const Purchases = require('react-native-purchases').default;
+      Purchases.configure({ apiKey: REVENUECAT_IOS_KEY });
+      const offerings = await Purchases.getOfferings();
+      if (offerings.current && offerings.current.availablePackages.length > 0) {
+        setPackages(offerings.current.availablePackages);
+      }
+    } catch (e) {
+      console.log('RevenueCat init error:', e);
     }
+  };
 
+  const handleSubscribeIOS = async (planId) => {
     setLoading(true);
-    await setUserEmail(email);
+    try {
+      const Purchases = require('react-native-purchases').default;
+      // Find matching package
+      const pkg = packages.find(p =>
+        (planId === 'monthly' && p.packageType === 'MONTHLY') ||
+        (planId === 'yearly' && p.packageType === 'ANNUAL') ||
+        (planId === 'agency' && p.identifier === RC_AGENCY_ID)
+      ) || packages[0];
 
-    const result = await startSubscription(plan, email);
+      if (!pkg) {
+        Alert.alert('Not available', 'Subscription products are being configured. Please try again shortly.');
+        setLoading(false);
+        return;
+      }
 
-    if (result.url) {
-      Linking.openURL(result.url);
-      Alert.alert(
-        'Complete checkout',
-        'Your browser will open to complete the Stripe checkout. Return to the app after subscribing.',
-        [
-          {
-            text: 'I\'ve Subscribed',
-            onPress: async () => {
-              await setSubscribed(true);
-              setSubStatus(true);
-            },
-          },
-        ]
-      );
-    } else {
-      Alert.alert('Error', result.error || 'Failed to start checkout. Try again.');
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      if (customerInfo.entitlements.active['pro']) {
+        await setSubscribed(true);
+        setSubStatus(true);
+        Alert.alert('Welcome to ContentAI Pro!', 'Your subscription is now active.');
+      }
+    } catch (e) {
+      if (!e.userCancelled) {
+        Alert.alert('Purchase failed', e.message || 'Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleSubscribeWeb = async (planId) => {
+    const links = {
+      monthly: 'https://buy.stripe.com/5kQ9AT1kEcsjgxZ1Ag6Vq06',
+      yearly: 'https://buy.stripe.com/7sY14ngfy3VN0z1diY6Vq09',
+      agency: 'https://buy.stripe.com/14A4gz7J277Z4Phen26Vq0a',
+    };
+    Linking.openURL(links[planId]);
+    Alert.alert(
+      'Complete checkout',
+      'Your browser will open to complete the Stripe checkout. Return to the app after subscribing.',
+      [{
+        text: "I've Subscribed",
+        onPress: async () => {
+          await setSubscribed(true);
+          setSubStatus(true);
+        },
+      }]
+    );
+  };
+
+  const handleSubscribe = (planId) => {
+    if (Platform.OS === 'ios') {
+      handleSubscribeIOS(planId);
+    } else {
+      handleSubscribeWeb(planId);
+    }
   };
 
   const plans = [
     {
       name: 'Pro Monthly',
-      price: '$29.99',
+      price: 'CA$29.99',
       period: '/month',
-      features: ['Unlimited content generation', 'All platforms supported', 'Ad copy & email campaigns', 'Blog articles & SEO', 'Brand voice customization', 'Content history & drafts'],
+      features: [
+        'Unlimited content generation',
+        'All platforms supported',
+        'Ad copy & email campaigns',
+        'Blog articles & SEO',
+        'Brand voice customization',
+        'Content history & drafts',
+      ],
       plan: 'monthly',
       popular: false,
     },
     {
       name: 'Pro Yearly',
-      price: '$249.99',
+      price: 'CA$249.99',
       period: '/year',
-      features: ['Everything in Pro Monthly', 'Save 30% (2 months free)', 'Priority AI processing', 'Early access features', 'Premium support'],
+      features: [
+        'Everything in Pro Monthly',
+        'Save 30% (2 months free)',
+        'Priority AI processing',
+        'Early access features',
+        'Premium support',
+      ],
       plan: 'yearly',
       popular: true,
       badge: 'Save 30%',
     },
     {
       name: 'Agency',
-      price: '$49.99',
+      price: 'CA$49.99',
       period: '/month',
-      features: ['Everything in Pro', 'Multiple brand profiles', 'Bulk content generation', 'Team collaboration', 'White-label exports'],
+      features: [
+        'Everything in Pro',
+        'Multiple brand profiles',
+        'Bulk content generation',
+        'Team collaboration',
+        'White-label exports',
+      ],
       plan: 'agency',
       popular: false,
     },
@@ -115,18 +188,6 @@ export default function PaywallScreen() {
           <Text style={styles.subtitle}>No more limits. Generate as much content as you need.</Text>
         </View>
 
-        <View style={styles.emailSection}>
-          <Text style={styles.emailLabel}>Your Email</Text>
-          <TextInput
-            style={styles.emailInput}
-            placeholder="you@business.com"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
         {plans.map((plan, index) => (
           <View key={index} style={[styles.planCard, plan.popular && styles.planCardPopular]}>
             {plan.badge && (
@@ -159,9 +220,13 @@ export default function PaywallScreen() {
           </View>
         ))}
 
+        <Text style={styles.legalText}>
+          Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel subscriptions in your Apple ID Account Settings.
+        </Text>
+
         <View style={styles.trustRow}>
           <Ionicons name="lock-closed" size={14} color="#999" />
-          <Text style={styles.trustText}>Cancel anytime · Secure payment via Stripe</Text>
+          <Text style={styles.trustText}>Cancel anytime · Secure payment</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -175,9 +240,6 @@ const styles = StyleSheet.create({
   heroBadgeText: { color: 'white', fontWeight: '700', fontSize: 12 },
   title: { fontSize: 28, fontWeight: '800', color: '#1C1C1E', textAlign: 'center' },
   subtitle: { fontSize: 15, color: '#999', textAlign: 'center', marginTop: 8 },
-  emailSection: { paddingHorizontal: 20, marginTop: 24 },
-  emailLabel: { fontSize: 14, fontWeight: '600', color: '#555', marginBottom: 8 },
-  emailInput: { backgroundColor: 'white', borderRadius: 14, padding: 16, fontSize: 15, borderWidth: 1, borderColor: '#E5E7EB' },
   planCard: { marginHorizontal: 20, marginTop: 16, backgroundColor: 'white', borderRadius: 20, padding: 24, borderWidth: 2, borderColor: '#F0F0F0', position: 'relative' },
   planCardPopular: { borderColor: THEME },
   popularBadge: { position: 'absolute', top: -12, left: '50%', transform: [{ translateX: -50 }], backgroundColor: THEME, paddingHorizontal: 16, paddingVertical: 4, borderRadius: 100 },
@@ -193,7 +255,8 @@ const styles = StyleSheet.create({
   subscribeBtnPrimary: { backgroundColor: THEME },
   subscribeBtnSecondary: { backgroundColor: THEME_LIGHT },
   subscribeBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
-  trustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20 },
+  legalText: { fontSize: 11, color: '#999', textAlign: 'center', marginHorizontal: 24, marginTop: 20, lineHeight: 16 },
+  trustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 },
   trustText: { fontSize: 13, color: '#999' },
   subscribedView: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   checkCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: THEME, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
