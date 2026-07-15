@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "image": "./assets/splash.png"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aibusinessassistant.contentai",
@@ -19,7 +21,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDisplayName": "ContentAI Pro"
       },
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +29,7 @@
         "backgroundColor": "#7C3AED"
       },
       "package": "com.aibusinessassistant.contentai",
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "favicon": "./assets/favicon.png",
