@@ -40,6 +40,10 @@
         "projectId": "f4ff5431-2f66-4424-ab90-d852f31a5f36"
       }
     },
-    "owner": "bc-canadian-usa-global-ventures-llc"
+    "owner": "bc-canadian-usa-global-ventures-llc",
+    "plugins": [
+      "expo-font",
+      "expo-asset"
+    ]
   }
 }
