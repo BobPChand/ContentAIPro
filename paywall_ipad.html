@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=768, initial-scale=1.0">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 768px;
+    height: 1024px;
+    background: #FAFAFA;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container {
+    padding-top: 80px;
+    padding-bottom: 30px;
+    width: 100%;
+    max-width: 680px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .header {
+    text-align: center;
+    padding: 0 40px 10px;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #7C3AED;
+    padding: 8px 24px;
+    border-radius: 100px;
+    margin-bottom: 20px;
+  }
+  .hero-badge-text {
+    color: white;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .title {
+    font-size: 42px;
+    font-weight: 800;
+    color: #1C1C1E;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 20px;
+    color: #999;
+    text-align: center;
+    margin-top: 10px;
+  }
+  .plans {
+    width: 100%;
+    padding: 0 40px;
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .plan-card {
+    background: white;
+    border-radius: 24px;
+    padding: 24px 28px;
+    border: 2px solid #F0F0F0;
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .plan-card.popular {
+    border-color: #7C3AED;
+  }
+  .popular-badge {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #7C3AED;
+    padding: 4px 20px;
+    border-radius: 100px;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .plan-left {
+    flex: 1;
+  }
+  .plan-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1C1C1E;
+  }
+  .price-row {
+    display: flex;
+    align-items: baseline;
+    margin-top: 6px;
+  }
+  .plan-price {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1C1C1E;
+  }
+  .plan-period {
+    font-size: 16px;
+    color: #999;
+    margin-left: 4px;
+  }
+  .features-list {
+    margin-top: 12px;
+  }
+  .feature-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .check-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #7C3AED;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .feature-text {
+    font-size: 16px;
+    color: #555;
+  }
+  .plan-right {
+    flex-shrink: 0;
+    margin-left: 20px;
+  }
+  .subscribe-btn {
+    text-align: center;
+    padding: 16px 28px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 18px;
+    white-space: nowrap;
+  }
+  .subscribe-btn-primary {
+    background: #7C3AED;
+    color: white;
+  }
+  .subscribe-btn-secondary {
+    background: #F3EEFF;
+    color: #7C3AED;
+  }
+  .footer {
+    text-align: center;
+    margin-top: 16px;
+  }
+  .restore-text {
+    color: #7C3AED;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .trust-text {
+    font-size: 14px;
+    color: #999;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="hero-badge">
+      <span class="hero-badge-text">7-DAY FREE TRIAL</span>
+    </div>
+    <div class="title">Unlock Unlimited Content</div>
+    <div class="subtitle">No more limits. Generate as much content as you need.</div>
+  </div>
+
+  <div class="plans">
+    <div class="plan-card">
+      <div class="plan-left">
+        <div class="plan-name">Pro Monthly</div>
+        <div class="price-row">
+          <span class="plan-price">$29.99</span>
+          <span class="plan-period">/month</span>
+        </div>
+        <div class="features-list">
+          <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Unlimited content generation</span></div>
+          <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">All platforms & ad copy</span></div>
+        </div>
+      </div>
+      <div class="plan-right">
+        <div class="subscribe-btn subscribe-btn-secondary">Start Free Trial</div>
+      </div>
+    </div>
+
+    <div class="plan-card popular">
+      <div class="popular-badge">Save 30%</div>
+      <div class="plan-left">
+        <div class="plan-name">Pro Yearly</div>
+        <div class="price-row">
+          <span class="plan-price">$249.99</span>
+          <span class="plan-period">/year</span>
+        </div>
+        <div class="features-list">
+          <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Everything in Pro Monthly</span></div>
+          <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Priority AI processing</span></div>
+        </div>
+      </div>
+      <div class="plan-right">
+        <div class="subscribe-btn subscribe-btn-primary">Start Free Trial</div>
+      </div>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-left">
+        <div class="plan-name">Agency</div>
+        <div class="price-row">
+          <span class="plan-price">$49.99</span>
+          <span class="plan-period">/month</span>
+        </div>
+        <div class="features-list">
+          <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Multiple brand profiles</span></div>
+          <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">White-label exports</span></div>
+        </div>
+      </div>
+      <div class="plan-right">
+        <div class="subscribe-btn subscribe-btn-secondary">Start Free Trial</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="restore-text">Restore Purchases</div>
+    <div class="trust-text">Cancel anytime - Secure payment</div>
+  </div>
+</div>
+</body>
+</html>

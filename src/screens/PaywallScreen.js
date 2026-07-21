@@ -9,7 +9,7 @@ import { isSubscribed, setSubscribed } from '../services/ApiService';
 // not an external payment link. This screen routes iOS purchases through RevenueCat.
 // Web and Android continue to use Stripe Checkout directly.
 
-const REVENUECAT_IOS_KEY = 'appl_mQirzUNOkoyePqxgcGTIMavyzzQ'; // TODO: Replace with your RevenueCat iOS public key
+const REVENUECAT_IOS_KEY = 'appl_lYJGcqPZIuYaWevlqKbxRCghHuY';
 
 const THEME = '#7C3AED';
 const THEME_LIGHT = '#F3EEFF';

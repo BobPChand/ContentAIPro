@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=393, initial-scale=1.0">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 393px;
+    min-height: 852px;
+    background: #FAFAFA;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    overflow-x: hidden;
+  }
+  .container {
+    padding-top: 60px;
+    padding-bottom: 40px;
+  }
+  .header {
+    text-align: center;
+    padding: 0 20px 10px;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #7C3AED;
+    padding: 6px 16px;
+    border-radius: 100px;
+    margin-bottom: 16px;
+  }
+  .hero-badge-text {
+    color: white;
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .title {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1C1C1E;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 15px;
+    color: #999;
+    text-align: center;
+    margin-top: 8px;
+  }
+  .plan-card {
+    margin: 16px 20px;
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    border: 2px solid #F0F0F0;
+    position: relative;
+  }
+  .plan-card.popular {
+    border-color: #7C3AED;
+  }
+  .popular-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #7C3AED;
+    padding: 4px 16px;
+    border-radius: 100px;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .plan-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1C1C1E;
+  }
+  .price-row {
+    display: flex;
+    align-items: baseline;
+    margin-top: 8px;
+    margin-bottom: 16px;
+  }
+  .plan-price {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1C1C1E;
+  }
+  .plan-period {
+    font-size: 16px;
+    color: #999;
+    margin-left: 4px;
+  }
+  .features-list {
+    margin-bottom: 20px;
+  }
+  .feature-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .check-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #7C3AED;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .feature-text {
+    font-size: 14px;
+    color: #555;
+  }
+  .subscribe-btn {
+    text-align: center;
+    padding: 14px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .subscribe-btn-primary {
+    background: #7C3AED;
+    color: white;
+  }
+  .subscribe-btn-secondary {
+    background: #F3EEFF;
+    color: #7C3AED;
+  }
+  .legal-text {
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+    padding: 0 28px;
+    margin-top: 16px;
+    line-height: 1.5;
+  }
+  .restore-btn {
+    text-align: center;
+    padding: 12px;
+    margin: 16px 20px 8px;
+  }
+  .restore-btn-text {
+    color: #7C3AED;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .trust-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .trust-text {
+    font-size: 12px;
+    color: #999;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="hero-badge">
+      <span style="color:white;font-size:12px;">🚀</span>
+      <span class="hero-badge-text">7-DAY FREE TRIAL</span>
+    </div>
+    <div class="title">Unlock Unlimited Content</div>
+    <div class="subtitle">No more limits. Generate as much content as you need.</div>
+  </div>
+
+  <div class="plan-card">
+    <div class="plan-name">Pro Monthly</div>
+    <div class="price-row">
+      <span class="plan-price">CA$29.99</span>
+      <span class="plan-period">/month</span>
+    </div>
+    <div class="features-list">
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Unlimited content generation</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">All platforms supported</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Ad copy & email campaigns</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Blog articles & SEO</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Brand voice customization</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Content history & drafts</span></div>
+    </div>
+    <div class="subscribe-btn subscribe-btn-secondary">Start Free Trial</div>
+  </div>
+
+  <div class="plan-card popular">
+    <div class="popular-badge">Save 30%</div>
+    <div class="plan-name">Pro Yearly</div>
+    <div class="price-row">
+      <span class="plan-price">CA$249.99</span>
+      <span class="plan-period">/year</span>
+    </div>
+    <div class="features-list">
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Everything in Pro Monthly</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Save 30% (2 months free)</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Priority AI processing</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Early access features</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Premium support</span></div>
+    </div>
+    <div class="subscribe-btn subscribe-btn-primary">Start Free Trial</div>
+  </div>
+
+  <div class="plan-card">
+    <div class="plan-name">Agency</div>
+    <div class="price-row">
+      <span class="plan-price">CA$49.99</span>
+      <span class="plan-period">/month</span>
+    </div>
+    <div class="features-list">
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Everything in Pro</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Multiple brand profiles</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Bulk content generation</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">Team collaboration</span></div>
+      <div class="feature-row"><div class="check-icon">✓</div><span class="feature-text">White-label exports</span></div>
+    </div>
+    <div class="subscribe-btn subscribe-btn-secondary">Start Free Trial</div>
+  </div>
+
+  <div class="legal-text">
+    Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel subscriptions in your Apple ID Account Settings.
+  </div>
+  <div class="restore-btn"><span class="restore-btn-text">Restore Purchases</span></div>
+  <div class="trust-row"><span class="trust-text">🔒 Cancel anytime · Secure payment</span></div>
+</div>
+</body>
+</html>
