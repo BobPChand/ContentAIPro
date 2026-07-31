@@ -1,9 +1,9 @@
 import * as React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { generateContent, canGenerate, incrementGenerationsUsed, isSubscribed, getBrandProfile, saveContent } from '../services/ApiService';
+import { generateContent, canGenerate, incrementGenerationsUsed, isSubscribed, getBrandProfile, saveContent, hasAIConsent, setAIConsent } from '../services/ApiService';
 
 const THEME = '#7C3AED';
 const THEME_LIGHT = '#F3EEFF';
@@ -45,6 +45,7 @@ export default function GenerateScreen({ route, navigation }) {
   const [variations, setVariations] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [showConsent, setShowConsent] = React.useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -52,6 +53,17 @@ export default function GenerateScreen({ route, navigation }) {
       return;
     }
 
+    // Check AI consent first
+    const consented = await hasAIConsent();
+    if (!consented) {
+      setShowConsent(true);
+      return;
+    }
+
+    await proceedWithGeneration();
+  };
+
+  const proceedWithGeneration = async () => {
     const allowed = await canGenerate();
     if (!allowed) {
       Alert.alert(
@@ -89,7 +101,6 @@ export default function GenerateScreen({ route, navigation }) {
     if (result.success && result.data?.variations) {
       setVariations(result.data.variations);
       await incrementGenerationsUsed();
-      // Save first variation
       await saveContent({
         content: result.data.variations[0].content,
         contentType,
@@ -103,6 +114,17 @@ export default function GenerateScreen({ route, navigation }) {
     }
   };
 
+  const handleConsentAccept = async () => {
+    await setAIConsent(true);
+    setShowConsent(false);
+    await proceedWithGeneration();
+  };
+
+  const handleConsentDecline = () => {
+    setShowConsent(false);
+    Alert.alert('Consent required', 'You must consent to AI data processing to use content generation.');
+  };
+
   const copyContent = async (text) => {
     await Clipboard.setStringAsync(text);
     Alert.alert('Copied!', 'Content copied to clipboard.');
@@ -114,7 +136,7 @@ export default function GenerateScreen({ route, navigation }) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
           <View style={styles.header}>
             <Text style={styles.title}>Generate Content</Text>
-            <Text style={styles.subtitle}>Describe what you need — AI does the rest</Text>
+            <Text style={styles.subtitle}>Describe what you need - AI does the rest</Text>
           </View>
 
           {/* Content Type Selector */}
@@ -218,6 +240,36 @@ export default function GenerateScreen({ route, navigation }) {
           ))}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* AI Consent Modal */}
+      <Modal visible={showConsent} transparent animationType="fade" onRequestClose={handleConsentDecline}>
+        <View style={styles.consentOverlay}>
+          <View style={styles.consentCard}>
+            <View style={styles.consentIcon}>
+              <Ionicons name="shield-checkmark" size={40} color={THEME} />
+            </View>
+            <Text style={styles.consentTitle}>AI Data Processing Consent</Text>
+            <Text style={styles.consentBody}>
+              ContentAI Pro uses OpenAI to generate content. Your prompt text and brand profile information will be sent to OpenAI's servers for processing. This data is used solely to generate your requested content and is not stored permanently.
+            </Text>
+            <Text style={styles.consentBody}>
+              By continuing, you consent to this data processing. You can withdraw consent at any time by contacting support.
+            </Text>
+            <View style={styles.consentLinks}>
+              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/privacy')}>Privacy Policy</Text>
+              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/terms')}>Terms of Use</Text>
+            </View>
+            <View style={styles.consentBtns}>
+              <TouchableOpacity style={styles.consentDeclineBtn} onPress={handleConsentDecline}>
+                <Text style={styles.consentDeclineText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.consentAcceptBtn} onPress={handleConsentAccept}>
+                <Text style={styles.consentAcceptText}>I Consent</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -237,18 +289,30 @@ const styles = StyleSheet.create({
   chipToneActive: { backgroundColor: '#1C1C1E' },
   chipToneText: { fontSize: 13, fontWeight: '600', color: '#555' },
   chipToneTextActive: { color: 'white' },
-  promptInput: { marginHorizontal: 20, backgroundColor: 'white', borderRadius: 14, padding: 16, fontSize: 15, minHeight: 100, textAlignVertical: 'top', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  generateBtn: { marginHorizontal: 20, marginTop: 20, backgroundColor: THEME, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 14, gap: 8, shadowColor: THEME, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  promptInput: { marginHorizontal: 20, marginTop: 8, backgroundColor: 'white', borderRadius: 16, padding: 16, fontSize: 15, minHeight: 100, borderWidth: 1, borderColor: '#E5E5E5' },
+  generateBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: THEME, borderRadius: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   generateBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
-  errorBox: { marginHorizontal: 20, marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFEAEA', padding: 14, borderRadius: 12 },
+  errorBox: { marginHorizontal: 20, marginTop: 12, backgroundColor: '#FFF0F0', borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   errorText: { color: '#FF3B30', fontSize: 14, flex: 1 },
-  resultCard: { marginHorizontal: 20, marginTop: 16, backgroundColor: 'white', borderRadius: 16, padding: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
+  resultCard: { marginHorizontal: 20, marginTop: 16, backgroundColor: 'white', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#F0F0F0' },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  resultBadge: { fontSize: 12, fontWeight: '700', color: THEME, backgroundColor: THEME_LIGHT, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 100 },
+  resultBadge: { fontSize: 12, fontWeight: '700', color: THEME, backgroundColor: THEME_LIGHT, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100 },
   copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   copyText: { color: THEME, fontSize: 13, fontWeight: '600' },
-  resultContent: { fontSize: 15, color: '#333', lineHeight: 24 },
+  resultContent: { fontSize: 14, color: '#333', lineHeight: 22 },
   hashtagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  hashtag: { fontSize: 13, color: THEME, fontWeight: '500' },
+  hashtag: { fontSize: 13, color: THEME, backgroundColor: THEME_LIGHT, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   wordCount: { fontSize: 12, color: '#999', marginTop: 8 },
+  consentOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  consentCard: { backgroundColor: 'white', borderRadius: 24, padding: 28, width: '100%', maxWidth: 360 },
+  consentIcon: { alignItems: 'center', marginBottom: 16 },
+  consentTitle: { fontSize: 20, fontWeight: '800', color: '#1C1C1E', textAlign: 'center', marginBottom: 12 },
+  consentBody: { fontSize: 14, color: '#555', lineHeight: 20, marginBottom: 10 },
+  consentLinks: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8, marginBottom: 20 },
+  consentLink: { color: THEME, fontSize: 13, fontWeight: '600' },
+  consentBtns: { flexDirection: 'row', gap: 12 },
+  consentDeclineBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#F0F0F0', alignItems: 'center' },
+  consentDeclineText: { color: '#666', fontWeight: '600', fontSize: 15 },
+  consentAcceptBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: THEME, alignItems: 'center' },
+  consentAcceptText: { color: 'white', fontWeight: '700', fontSize: 15 },
 });

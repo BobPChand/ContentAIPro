@@ -2,89 +2,90 @@ import * as React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { isSubscribed, setSubscribed } from '../services/ApiService';
-
-// NOTE ON APPLE COMPLIANCE (Guideline 3.1.1):
-// On iOS, subscriptions MUST go through Apple's native In-App Purchase (StoreKit),
-// not an external payment link. This screen routes iOS purchases through RevenueCat.
-// Web and Android continue to use Stripe Checkout directly.
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const REVENUECAT_IOS_KEY = 'appl_lYJGcqPZIuYaWevlqKbxRCghHuY';
-
 const THEME = '#7C3AED';
 const THEME_LIGHT = '#F3EEFF';
-
-// RevenueCat package identifiers - must match App Store Connect & RevenueCat dashboard
-const RC_MONTHLY_ID = '$rc_monthly';
-const RC_ANNUAL_ID = '$rc_annual';
-const RC_AGENCY_ID = 'agency';
+const ENTITLEMENT_ID = 'pro';
+const STORAGE_KEY = 'contentai_pro_status';
 
 export default function PaywallScreen() {
   const [subscribed, setSubStatus] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [checking, setChecking] = React.useState(true);
   const [packages, setPackages] = React.useState([]);
 
   React.useEffect(() => {
-    checkStatus();
-    if (Platform.OS === 'ios') {
-      initRevenueCat();
-    }
+    initAndCheck();
   }, []);
 
-  const checkStatus = async () => {
-    const sub = await isSubscribed();
-    setSubStatus(sub);
-  };
-
-  const initRevenueCat = async () => {
+  const initAndCheck = async () => {
     try {
       const Purchases = require('react-native-purchases').default;
-      Purchases.configure({ apiKey: REVENUECAT_IOS_KEY });
-      const offerings = await Purchases.getOfferings();
-      if (offerings.current && offerings.current.availablePackages.length > 0) {
-        setPackages(offerings.current.availablePackages);
+      await Purchases.configure({ apiKey: REVENUECAT_IOS_KEY });
+
+      // Check subscription status from RevenueCat (receipt-verified)
+      try {
+        const customerInfo = await Purchases.getCustomerInfo();
+        if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
+          await AsyncStorage.setItem(STORAGE_KEY, 'pro');
+          setSubStatus(true);
+          setChecking(false);
+          return;
+        }
+      } catch (e) {
+        console.log('CustomerInfo check failed:', e);
+      }
+
+      // Also check local cache
+      const cached = await AsyncStorage.getItem(STORAGE_KEY);
+      if (cached === 'pro') {
+        setSubStatus(true);
+      }
+
+      // Load offerings for dynamic pricing
+      try {
+        const offerings = await Purchases.getOfferings();
+        if (offerings.current && offerings.current.availablePackages.length > 0) {
+          setPackages(offerings.current.availablePackages);
+        }
+      } catch (e) {
+        console.log('Offerings error:', e);
       }
     } catch (e) {
       console.log('RevenueCat init error:', e);
     }
+    setChecking(false);
   };
 
-  const handleRestore = async () => {
-    try {
-      const Purchases = require('react-native-purchases').default;
-      const info = await Purchases.restorePurchases();
-      if (Object.keys(info.entitlements.active).length > 0) {
-        await setSubscribed(true);
-        setSubStatus(true);
-        Alert.alert('Restored!', 'Your subscription has been restored.');
-      } else {
-        Alert.alert('Nothing to restore', 'No active subscription found.');
-      }
-    } catch(e) {
-      Alert.alert('Error', e.message);
+  const formatPrice = (pkg) => {
+    if (!pkg || !pkg.product) return '';
+    const product = pkg.product;
+    if (product.priceString) return product.priceString;
+    return `$${(product.price || 0).toFixed(2)}`;
+  };
+
+  const getPricePeriod = (pkg) => {
+    if (!pkg) return '';
+    switch (pkg.packageType) {
+      case 'MONTHLY': return '/month';
+      case 'ANNUAL': return '/year';
+      default: return '';
     }
   };
 
-  const handleSubscribeIOS = async (planId) => {
+  const handlePurchase = async (pkg) => {
+    if (!pkg) {
+      Alert.alert('Not available', 'Subscription products are being configured. Please try again shortly.');
+      return;
+    }
     setLoading(true);
     try {
       const Purchases = require('react-native-purchases').default;
-      // Find matching package
-      const pkg = packages.find(p =>
-        (planId === 'monthly' && p.packageType === 'MONTHLY') ||
-        (planId === 'yearly' && p.packageType === 'ANNUAL') ||
-        (planId === 'agency' && p.identifier === RC_AGENCY_ID)
-      ) || packages[0];
-
-      if (!pkg) {
-        Alert.alert('Not available', 'Subscription products are being configured. Please try again shortly.');
-        setLoading(false);
-        return;
-      }
-
       const { customerInfo } = await Purchases.purchasePackage(pkg);
-      if (customerInfo.entitlements.active['pro']) {
-        await setSubscribed(true);
+      if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
+        await AsyncStorage.setItem(STORAGE_KEY, 'pro');
         setSubStatus(true);
         Alert.alert('Welcome to ContentAI Pro!', 'Your subscription is now active.');
       }
@@ -97,80 +98,34 @@ export default function PaywallScreen() {
     }
   };
 
-  const handleSubscribeWeb = async (planId) => {
-    const links = {
-      monthly: 'https://buy.stripe.com/5kQ9AT1kEcsjgxZ1Ag6Vq06',
-      yearly: 'https://buy.stripe.com/7sY14ngfy3VN0z1diY6Vq09',
-      agency: 'https://buy.stripe.com/14A4gz7J277Z4Phen26Vq0a',
-    };
-    Linking.openURL(links[planId]);
-    Alert.alert(
-      'Complete checkout',
-      'Your browser will open to complete the Stripe checkout. Return to the app after subscribing.',
-      [{
-        text: "I've Subscribed",
-        onPress: async () => {
-          await setSubscribed(true);
-          setSubStatus(true);
-        },
-      }]
-    );
-  };
-
-  const handleSubscribe = (planId) => {
-    if (Platform.OS === 'ios') {
-      handleSubscribeIOS(planId);
-    } else {
-      handleSubscribeWeb(planId);
+  const handleRestore = async () => {
+    setLoading(true);
+    try {
+      const Purchases = require('react-native-purchases').default;
+      const info = await Purchases.restorePurchases();
+      if (info.entitlements.active[ENTITLEMENT_ID]) {
+        await AsyncStorage.setItem(STORAGE_KEY, 'pro');
+        setSubStatus(true);
+        Alert.alert('Restored!', 'Your subscription has been restored.');
+      } else {
+        Alert.alert('Nothing to restore', 'No active subscription found.');
+      }
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Could not restore purchases.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const plans = [
-    {
-      name: 'Pro Monthly',
-      price: 'CA$29.99',
-      period: '/month',
-      features: [
-        'Unlimited content generation',
-        'All platforms supported',
-        'Ad copy & email campaigns',
-        'Blog articles & SEO',
-        'Brand voice customization',
-        'Content history & drafts',
-      ],
-      plan: 'monthly',
-      popular: false,
-    },
-    {
-      name: 'Pro Yearly',
-      price: 'CA$249.99',
-      period: '/year',
-      features: [
-        'Everything in Pro Monthly',
-        'Save 30% (2 months free)',
-        'Priority AI processing',
-        'Early access features',
-        'Premium support',
-      ],
-      plan: 'yearly',
-      popular: true,
-      badge: 'Save 30%',
-    },
-    {
-      name: 'Agency',
-      price: 'CA$49.99',
-      period: '/month',
-      features: [
-        'Everything in Pro',
-        'Multiple brand profiles',
-        'Bulk content generation',
-        'Team collaboration',
-        'White-label exports',
-      ],
-      plan: 'agency',
-      popular: false,
-    },
-  ];
+  if (checking) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingView}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (subscribed) {
     return (
@@ -183,7 +138,7 @@ export default function PaywallScreen() {
           <Text style={styles.subscribedSub}>Enjoy unlimited AI content generation</Text>
           <TouchableOpacity
             style={styles.manageBtn}
-            onPress={() => Linking.openURL('https://billing.stripe.com/p/login/')}
+            onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
           >
             <Text style={styles.manageBtnText}>Manage Subscription</Text>
           </TouchableOpacity>
@@ -192,14 +147,73 @@ export default function PaywallScreen() {
     );
   }
 
+  // Find packages from RevenueCat offerings
+  const monthlyPkg = packages.find(p => p.packageType === 'MONTHLY') || packages.find(p => p.identifier === '$rc_monthly');
+  const annualPkg = packages.find(p => p.packageType === 'ANNUAL') || packages.find(p => p.identifier === '$rc_annual');
+
+  const plans = [];
+  if (annualPkg) {
+    plans.push({
+      name: 'Pro Yearly',
+      price: formatPrice(annualPkg),
+      period: getPricePeriod(annualPkg),
+      features: [
+        'Everything in Pro Monthly',
+        'Save vs monthly billing',
+        'Priority AI processing',
+        'Early access features',
+        'Premium support',
+      ],
+      pkg: annualPkg,
+      popular: true,
+      badge: 'Best Value',
+    });
+  }
+  if (monthlyPkg) {
+    plans.push({
+      name: 'Pro Monthly',
+      price: formatPrice(monthlyPkg),
+      period: getPricePeriod(monthlyPkg),
+      features: [
+        'Unlimited content generation',
+        'All platforms supported',
+        'Ad copy & email campaigns',
+        'Blog articles & SEO',
+        'Brand voice customization',
+        'Content history & drafts',
+      ],
+      pkg: monthlyPkg,
+      popular: false,
+    });
+  }
+
+  // Fallback if no packages loaded yet
+  if (plans.length === 0) {
+    plans.push(
+      {
+        name: 'Pro Yearly',
+        price: '',
+        period: '/year',
+        features: ['Everything in Pro Monthly', 'Save vs monthly billing', 'Priority AI processing', 'Early access features', 'Premium support'],
+        pkg: null,
+        popular: true,
+        badge: 'Best Value',
+      },
+      {
+        name: 'Pro Monthly',
+        price: '',
+        period: '/month',
+        features: ['Unlimited content generation', 'All platforms supported', 'Ad copy & email campaigns', 'Blog articles & SEO', 'Brand voice customization', 'Content history & drafts'],
+        pkg: null,
+        popular: false,
+      }
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.header}>
-          <View style={styles.heroBadge}>
-            <Ionicons name="rocket" size={16} color="white" />
-            <Text style={styles.heroBadgeText}>7-DAY FREE TRIAL</Text>
-          </View>
           <Text style={styles.title}>Unlock Unlimited Content</Text>
           <Text style={styles.subtitle}>No more limits. Generate as much content as you need.</Text>
         </View>
@@ -226,27 +240,37 @@ export default function PaywallScreen() {
             </View>
             <TouchableOpacity
               style={[styles.subscribeBtn, plan.popular ? styles.subscribeBtnPrimary : styles.subscribeBtnSecondary]}
-              onPress={() => handleSubscribe(plan.plan)}
+              onPress={() => handlePurchase(plan.pkg)}
               disabled={loading}
             >
               <Text style={[styles.subscribeBtnText, plan.popular ? {} : { color: THEME }]}>
-                {loading ? 'Loading...' : 'Start Free Trial'}
+                {loading ? 'Loading...' : 'Upgrade to Pro'}
               </Text>
             </TouchableOpacity>
           </View>
         ))}
 
         <Text style={styles.legalText}>
-          Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage or cancel subscriptions in your Apple ID Account Settings.
+          Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. Manage or cancel subscriptions in your Apple ID Account Settings at any time.
         </Text>
 
-        <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
+        <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore} disabled={loading}>
           <Text style={styles.restoreBtnText}>Restore Purchases</Text>
         </TouchableOpacity>
 
         <View style={styles.trustRow}>
           <Ionicons name="lock-closed" size={14} color="#999" />
-          <Text style={styles.trustText}>Cancel anytime · Secure payment</Text>
+          <Text style={styles.trustText}>Cancel anytime - Secure payment</Text>
+        </View>
+
+        <View style={styles.linksRow}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/privacy')}>
+            <Text style={styles.linkText}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={styles.linkDivider}>|</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/terms')}>
+            <Text style={styles.linkText}>Terms of Use</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -255,9 +279,9 @@ export default function PaywallScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAFA' },
+  loadingView: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { fontSize: 16, color: '#999' },
   header: { alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-  heroBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: THEME, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 100, marginBottom: 16 },
-  heroBadgeText: { color: 'white', fontWeight: '700', fontSize: 12 },
   title: { fontSize: 28, fontWeight: '800', color: '#1C1C1E', textAlign: 'center' },
   subtitle: { fontSize: 15, color: '#999', textAlign: 'center', marginTop: 8 },
   planCard: { marginHorizontal: 20, marginTop: 16, backgroundColor: 'white', borderRadius: 20, padding: 24, borderWidth: 2, borderColor: '#F0F0F0', position: 'relative' },
@@ -280,6 +304,9 @@ const styles = StyleSheet.create({
   restoreBtnText: { color: '#7C3AED', fontWeight: '600', fontSize: 14 },
   trustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 },
   trustText: { fontSize: 13, color: '#999' },
+  linksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16 },
+  linkText: { color: '#7C3AED', fontSize: 13, fontWeight: '500' },
+  linkDivider: { color: '#ccc', fontSize: 13 },
   subscribedView: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   checkCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: THEME, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   subscribedTitle: { fontSize: 24, fontWeight: '800', color: '#1C1C1E' },

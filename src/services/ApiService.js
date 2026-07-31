@@ -14,27 +14,6 @@ export async function generateContent(params) {
   }
 }
 
-export async function startSubscription(plan, email) {
-  try {
-    const response = await fetch(`${API_BASE}/contentCheckout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, user_email: email }),
-    });
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return { error: error.message };
-  }
-}
-
-// Stripe Payment Links (for direct web sales)
-export const PAYMENT_LINKS = {
-  monthly: 'https://buy.stripe.com/8x214n7J2fEv4Ph4Ms6Vq03',
-  yearly: 'https://buy.stripe.com/7sY6oH7J2dwnepRen26Vq04',
-  agency: 'https://buy.stripe.com/6oUdR9gfydwnepR4Ms6Vq05',
-};
-
 // Storage keys
 export const STORAGE_KEYS = {
   IS_SUBSCRIBED: 'contentai_subscribed',
@@ -42,6 +21,7 @@ export const STORAGE_KEYS = {
   BRAND_PROFILE: 'contentai_brand',
   SAVED_CONTENT: 'contentai_saved_content',
   USER_EMAIL: 'contentai_user_email',
+  AI_CONSENT: 'contentai_ai_consent',
 };
 
 const FREE_TIER_LIMIT = 3;
@@ -60,6 +40,18 @@ export async function incrementGenerationsUsed() {
 }
 
 export async function isSubscribed() {
+  // Check RevenueCat first (receipt-verified)
+  try {
+    const Purchases = require('react-native-purchases').default;
+    const customerInfo = await Purchases.getCustomerInfo();
+    if (customerInfo.entitlements.active['pro']) {
+      await AsyncStorage.setItem(STORAGE_KEYS.IS_SUBSCRIBED, 'true');
+      return true;
+    }
+  } catch (e) {
+    console.log('RevenueCat check failed, falling back to local:', e);
+  }
+  // Fallback to local cache
   const val = await AsyncStorage.getItem(STORAGE_KEYS.IS_SUBSCRIBED);
   return val === 'true';
 }
@@ -80,6 +72,15 @@ export async function getRemainingFreeGenerations() {
   if (subscribed) return Infinity;
   const used = await getGenerationsUsed();
   return Math.max(0, FREE_TIER_LIMIT - used);
+}
+
+export async function hasAIConsent() {
+  const val = await AsyncStorage.getItem(STORAGE_KEYS.AI_CONSENT);
+  return val === 'true';
+}
+
+export async function setAIConsent(value) {
+  await AsyncStorage.setItem(STORAGE_KEYS.AI_CONSENT, value ? 'true' : 'false');
 }
 
 export async function saveBrandProfile(profile) {
