@@ -264,11 +264,11 @@ export default function PaywallScreen() {
         </View>
 
         <View style={styles.linksRow}>
-          <TouchableOpacity onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/privacy')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://base44.app/api/apps/6a336a00b083ccbe02ccfade/files/mp/public/6a336a00b083ccbe02ccfade/0f2e386a1_privacy_policy_contentai.html')}>
             <Text style={styles.linkText}>Privacy Policy</Text>
           </TouchableOpacity>
           <Text style={styles.linkDivider}>|</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/terms')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://base44.app/api/apps/6a336a00b083ccbe02ccfade/files/mp/public/6a336a00b083ccbe02ccfade/d1e2fd38d_eula_contentai_pro.html')}>
             <Text style={styles.linkText}>Terms of Use</Text>
           </TouchableOpacity>
         </View>

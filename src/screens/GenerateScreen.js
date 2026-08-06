@@ -256,8 +256,8 @@ export default function GenerateScreen({ route, navigation }) {
               By continuing, you consent to this data processing. You can withdraw consent at any time by contacting support.
             </Text>
             <View style={styles.consentLinks}>
-              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/privacy')}>Privacy Policy</Text>
-              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://aibusinessassistant.ai/contentai/terms')}>Terms of Use</Text>
+              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://base44.app/api/apps/6a336a00b083ccbe02ccfade/files/mp/public/6a336a00b083ccbe02ccfade/0f2e386a1_privacy_policy_contentai.html')}>Privacy Policy</Text>
+              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://base44.app/api/apps/6a336a00b083ccbe02ccfade/files/mp/public/6a336a00b083ccbe02ccfade/d1e2fd38d_eula_contentai_pro.html')}>Terms of Use</Text>
             </View>
             <View style={styles.consentBtns}>
               <TouchableOpacity style={styles.consentDeclineBtn} onPress={handleConsentDecline}>
