@@ -33,6 +33,9 @@ export default function HomeScreen({ navigation }) {
 
   const quickActions = [
     { icon: 'logo-instagram', label: 'Instagram Post', color: '#E1306C', type: 'social_post', platform: 'instagram' },
+    { icon: 'logo-tiktok', label: 'TikTok Script', color: '#000000', type: 'video_script', platform: 'tiktok' },
+    { icon: 'logo-youtube', label: 'YouTube Script', color: '#FF0000', type: 'video_script', platform: 'youtube' },
+    { icon: 'mic', label: 'Voice Over', color: '#FF6B35', type: 'voice_over', platform: 'podcast' },
     { icon: 'logo-facebook', label: 'Facebook Post', color: '#1877F2', type: 'social_post', platform: 'facebook' },
     { icon: 'logo-linkedin', label: 'LinkedIn Post', color: '#0A66C2', type: 'social_post', platform: 'linkedin' },
     { icon: 'mail', label: 'Email Campaign', color: '#EA4335', type: 'email_campaign', platform: 'email' },
@@ -70,7 +73,7 @@ export default function HomeScreen({ navigation }) {
           </View>
           <Text style={styles.statusSub}>
             {subscribed
-              ? 'Unlimited content generation active'
+              ? 'Unlimited content, video scripts & voice generation'
               : `${remaining === Infinity ? '∞' : remaining} free generations remaining`}
           </Text>
           {!subscribed && (
@@ -81,6 +84,17 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.upgradeBtnText}>Upgrade to Pro →</Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* New Feature Banner */}
+        <View style={styles.featureBanner}>
+          <View style={styles.featureBadge}>
+            <Text style={styles.featureBadgeText}>NEW</Text>
+          </View>
+          <View style={styles.featureContent}>
+            <Text style={styles.featureTitle}>Video Scripts & Voice Over 🎬</Text>
+            <Text style={styles.featureDesc}>Generate TikTok/YouTube scripts and AI voice narration</Text>
+          </View>
         </View>
 
         {/* Quick Actions */}
@@ -147,6 +161,12 @@ const styles = StyleSheet.create({
   statusSub: { fontSize: 14, color: '#666', marginTop: 6 },
   upgradeBtn: { marginTop: 12, backgroundColor: THEME, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 100, alignSelf: 'flex-start' },
   upgradeBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  featureBanner: { marginHorizontal: 20, marginTop: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16, gap: 12 },
+  featureBadge: { backgroundColor: THEME, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  featureBadgeText: { color: 'white', fontSize: 10, fontWeight: '800' },
+  featureContent: { flex: 1 },
+  featureTitle: { fontSize: 15, fontWeight: '700', color: 'white' },
+  featureDesc: { fontSize: 12, color: '#999', marginTop: 4 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1C1C1E', marginTop: 24, marginBottom: 12, paddingHorizontal: 20 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 },
   quickCard: { width: '33%', padding: 8, alignItems: 'center' },

@@ -3,7 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { generateContent, canGenerate, incrementGenerationsUsed, isSubscribed, getBrandProfile, saveContent, hasAIConsent, setAIConsent } from '../services/ApiService';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { generateContent, generateVoice, canGenerate, incrementGenerationsUsed, isSubscribed, getBrandProfile, saveContent, saveAudioRecord, hasAIConsent, setAIConsent } from '../services/ApiService';
 
 const THEME = '#7C3AED';
 const THEME_LIGHT = '#F3EEFF';
@@ -14,6 +17,8 @@ const CONTENT_TYPES = [
   { label: 'Blog Article', value: 'blog_article', icon: 'document-text' },
   { label: 'Email Campaign', value: 'email_campaign', icon: 'mail' },
   { label: 'Caption', value: 'caption', icon: 'text' },
+  { label: 'Video Script', value: 'video_script', icon: 'videocam' },
+  { label: 'Voice Over', value: 'voice_over', icon: 'mic' },
 ];
 
 const PLATFORMS = [
@@ -21,10 +26,14 @@ const PLATFORMS = [
   { label: 'Facebook', value: 'facebook', icon: 'logo-facebook' },
   { label: 'LinkedIn', value: 'linkedin', icon: 'logo-linkedin' },
   { label: 'X/Twitter', value: 'twitter', icon: 'logo-twitter' },
+  { label: 'TikTok', value: 'tiktok', icon: 'logo-tiktok' },
+  { label: 'YouTube', value: 'youtube', icon: 'logo-youtube' },
+  { label: 'Reels', value: 'reels', icon: 'film' },
   { label: 'Google Ads', value: 'google_ads', icon: 'megaphone' },
   { label: 'Facebook Ads', value: 'facebook_ads', icon: 'logo-facebook' },
   { label: 'Email', value: 'email', icon: 'mail' },
   { label: 'Blog', value: 'blog', icon: 'document-text' },
+  { label: 'Podcast', value: 'podcast', icon: 'podium' },
 ];
 
 const TONES = [
@@ -37,6 +46,15 @@ const TONES = [
   { label: 'Inspirational', value: 'inspirational' },
 ];
 
+const VOICES = [
+  { label: 'Nova', value: 'nova', desc: 'Female, warm' },
+  { label: 'Alloy', value: 'alloy', desc: 'Neutral' },
+  { label: 'Echo', value: 'echo', desc: 'Male, calm' },
+  { label: 'Fable', value: 'fable', desc: 'British, neutral' },
+  { label: 'Onyx', value: 'onyx', desc: 'Male, deep' },
+  { label: 'Shimmer', value: 'shimmer', desc: 'Female, bright' },
+];
+
 export default function GenerateScreen({ route, navigation }) {
   const [prompt, setPrompt] = React.useState('');
   const [contentType, setContentType] = React.useState(route.params?.presetType || 'social_post');
@@ -46,6 +64,19 @@ export default function GenerateScreen({ route, navigation }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const [showConsent, setShowConsent] = React.useState(false);
+  const [showVoicePicker, setShowVoicePicker] = React.useState(null);
+  const [voiceLoading, setVoiceLoading] = React.useState(null);
+  const [audioState, setAudioState] = React.useState({});
+  const [sound, setSound] = React.useState(null);
+  const [playingId, setPlayingId] = React.useState(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -53,7 +84,6 @@ export default function GenerateScreen({ route, navigation }) {
       return;
     }
 
-    // Check AI consent first
     const consented = await hasAIConsent();
     if (!consented) {
       setShowConsent(true);
@@ -80,6 +110,7 @@ export default function GenerateScreen({ route, navigation }) {
     setLoading(true);
     setError('');
     setVariations([]);
+    setAudioState({});
 
     const brand = await getBrandProfile();
 
@@ -130,13 +161,114 @@ export default function GenerateScreen({ route, navigation }) {
     Alert.alert('Copied!', 'Content copied to clipboard.');
   };
 
+  const handleGenerateVoice = async (variationId, text, voice) => {
+    setShowVoicePicker(null);
+    setVoiceLoading(variationId);
+
+    try {
+      // Strip hashtags and clean text for TTS
+      const cleanText = text.replace(/#[\w]+/g, '').replace(/\n{3,}/g, '\n\n').trim();
+
+      const result = await generateVoice(cleanText, voice);
+
+      if (result.success && result.data?.audio) {
+        // Save audio to file system
+        const fileName = `voice_${Date.now()}.mp3`;
+        const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+        await FileSystem.writeAsStringAsync(fileUri, result.data.audio, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        setAudioState(prev => ({
+          ...prev,
+          [variationId]: { fileUri, voice: result.data.voice, duration: result.data.duration_estimate }
+        }));
+
+        await saveAudioRecord({
+          text: cleanText.slice(0, 100),
+          voice: result.data.voice,
+          fileUri,
+          contentType,
+        });
+
+        // Auto-play the audio
+        await playAudio(variationId, fileUri);
+      } else {
+        Alert.alert('Voice generation failed', result.error || 'Please try again.');
+      }
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to generate voice.');
+    } finally {
+      setVoiceLoading(null);
+    }
+  };
+
+  const playAudio = async (variationId, fileUri) => {
+    try {
+      // Stop existing audio
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: fileUri },
+        { shouldPlay: true }
+      );
+
+      setSound(newSound);
+      setPlayingId(variationId);
+
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          setPlayingId(null);
+        }
+      });
+    } catch (err) {
+      Alert.alert('Playback error', err.message);
+    }
+  };
+
+  const stopAudio = async () => {
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+      setPlayingId(null);
+    }
+  };
+
+  const shareAudio = async (fileUri) => {
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'audio/mp3',
+          dialogTitle: 'Share Voice Over',
+        });
+      } else {
+        Alert.alert('Sharing not available', 'Cannot share audio on this device.');
+      }
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    }
+  };
+
+  const isVideoOrVoice = contentType === 'video_script' || contentType === 'voice_over';
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
           <View style={styles.header}>
             <Text style={styles.title}>Generate Content</Text>
-            <Text style={styles.subtitle}>Describe what you need - AI does the rest</Text>
+            <Text style={styles.subtitle}>Text, video scripts & voice — AI does it all</Text>
           </View>
 
           {/* Content Type Selector */}
@@ -184,12 +316,22 @@ export default function GenerateScreen({ route, navigation }) {
           </ScrollView>
 
           {/* Prompt Input */}
-          <Text style={styles.label}>What do you want to create?</Text>
+          <Text style={styles.label}>
+            {isVideoOrVoice
+              ? 'Describe your video or voice project'
+              : 'What do you want to create?'}
+          </Text>
           <TextInput
             style={styles.promptInput}
             multiline
             numberOfLines={4}
-            placeholder="e.g., Promote our summer sale with 30% off all products. Focus on urgency and FOMO."
+            placeholder={
+              contentType === 'video_script'
+                ? 'e.g., 30-second TikTok about our new skincare line, focus on natural ingredients'
+                : contentType === 'voice_over'
+                ? 'e.g., Professional narration for a product demo video, friendly tone'
+                : 'e.g., Promote our summer sale with 30% off all products. Focus on urgency and FOMO.'
+            }
             value={prompt}
             onChangeText={setPrompt}
             textAlignVertical="top"
@@ -201,8 +343,10 @@ export default function GenerateScreen({ route, navigation }) {
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Ionicons name="sparkles" size={20} color="white" />
-                <Text style={styles.generateBtnText}>Generate Content</Text>
+                <Ionicons name={isVideoOrVoice ? 'videocam' : 'sparkles'} size={20} color="white" />
+                <Text style={styles.generateBtnText}>
+                  {isVideoOrVoice ? 'Generate Script' : 'Generate Content'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -216,28 +360,74 @@ export default function GenerateScreen({ route, navigation }) {
           ) : null}
 
           {/* Results */}
-          {variations.map((variation, index) => (
-            <View key={index} style={styles.resultCard}>
-              <View style={styles.resultHeader}>
-                <Text style={styles.resultBadge}>Variation {index + 1}</Text>
-                <TouchableOpacity onPress={() => copyContent(variation.content)}>
-                  <View style={styles.copyBtn}>
-                    <Ionicons name="copy-outline" size={16} color={THEME} />
-                    <Text style={styles.copyText}>Copy</Text>
+          {variations.map((variation, index) => {
+            const vId = `v${index}`;
+            const hasAudio = audioState[vId];
+            const isPlaying = playingId === vId;
+            const isVoiceLoadingThis = voiceLoading === vId;
+
+            return (
+              <View key={index} style={styles.resultCard}>
+                <View style={styles.resultHeader}>
+                  <Text style={styles.resultBadge}>Variation {index + 1}</Text>
+                  <View style={styles.resultActions}>
+                    <TouchableOpacity
+                      style={styles.voiceBtn}
+                      onPress={() => setShowVoicePicker(vId)}
+                      disabled={isVoiceLoadingThis}
+                    >
+                      {isVoiceLoadingThis ? (
+                        <ActivityIndicator size={16} color={THEME} />
+                      ) : (
+                        <>
+                          <Ionicons name="mic" size={16} color={THEME} />
+                          <Text style={styles.voiceBtnText}>Voice</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => copyContent(variation.content)} style={styles.copyBtn}>
+                      <Ionicons name="copy-outline" size={16} color={THEME} />
+                      <Text style={styles.copyText}>Copy</Text>
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.resultContent}>{variation.content}</Text>
-              {variation.hashtags && variation.hashtags.length > 0 && (
-                <View style={styles.hashtagsRow}>
-                  {variation.hashtags.map((tag, i) => (
-                    <Text key={i} style={styles.hashtag}>#{tag}</Text>
-                  ))}
                 </View>
-              )}
-              <Text style={styles.wordCount}>{variation.word_count} words</Text>
-            </View>
-          ))}
+
+                <Text style={styles.resultContent}>{variation.content}</Text>
+
+                {variation.hashtags && variation.hashtags.length > 0 && (
+                  <View style={styles.hashtagsRow}>
+                    {variation.hashtags.map((tag, i) => (
+                      <Text key={i} style={styles.hashtag}>#{tag}</Text>
+                    ))}
+                  </View>
+                )}
+
+                <Text style={styles.wordCount}>{variation.word_count} words</Text>
+
+                {/* Audio Player */}
+                {hasAudio && (
+                  <View style={styles.audioPlayer}>
+                    <TouchableOpacity
+                      style={styles.playBtn}
+                      onPress={isPlaying ? stopAudio : () => playAudio(vId, hasAudio.fileUri)}
+                    >
+                      <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color="white" />
+                    </TouchableOpacity>
+                    <View style={styles.audioInfo}>
+                      <Text style={styles.audioVoiceText}>Voice: {hasAudio.voice}</Text>
+                      <Text style={styles.audioDurationText}>~{hasAudio.duration}s</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.shareBtn}
+                      onPress={() => shareAudio(hasAudio.fileUri)}
+                    >
+                      <Ionicons name="share-outline" size={18} color={THEME} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -250,16 +440,9 @@ export default function GenerateScreen({ route, navigation }) {
             </View>
             <Text style={styles.consentTitle}>AI Data Processing Consent</Text>
             <Text style={styles.consentBody}>
-              ContentAI Pro uses OpenAI to generate content. Your prompt text and brand profile information will be sent to OpenAI's servers for processing. This data is used solely to generate your requested content and is not stored permanently.
+              ContentAI Pro uses AI to generate content. Your prompts and brand information will be sent to our AI provider (OpenAI) for processing.{"\n\n"}Your data is never stored by the AI provider and is only used to generate your content.
             </Text>
-            <Text style={styles.consentBody}>
-              By continuing, you consent to this data processing. You can withdraw consent at any time by contacting support.
-            </Text>
-            <View style={styles.consentLinks}>
-              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://base44.app/api/apps/6a336a00b083ccbe02ccfade/files/mp/public/6a336a00b083ccbe02ccfade/0f2e386a1_privacy_policy_contentai.html')}>Privacy Policy</Text>
-              <Text style={styles.consentLink} onPress={() => Linking.openURL('https://base44.app/api/apps/6a336a00b083ccbe02ccfade/files/mp/public/6a336a00b083ccbe02ccfade/d1e2fd38d_eula_contentai_pro.html')}>Terms of Use</Text>
-            </View>
-            <View style={styles.consentBtns}>
+            <View style={styles.consentButtons}>
               <TouchableOpacity style={styles.consentDeclineBtn} onPress={handleConsentDecline}>
                 <Text style={styles.consentDeclineText}>Decline</Text>
               </TouchableOpacity>
@@ -270,6 +453,38 @@ export default function GenerateScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Voice Picker Modal */}
+      <Modal visible={showVoicePicker !== null} transparent animationType="fade" onRequestClose={() => setShowVoicePicker(null)}>
+        <View style={styles.consentOverlay}>
+          <View style={styles.voicePickerCard}>
+            <Text style={styles.voicePickerTitle}>Choose a Voice</Text>
+            <Text style={styles.voicePickerSubtitle}>AI will read the content aloud</Text>
+            {VOICES.map((v) => (
+              <TouchableOpacity
+                key={v.value}
+                style={styles.voiceOption}
+                onPress={() => {
+                  const variation = variations[parseInt(showVoicePicker.replace('v', ''))];
+                  if (variation) handleGenerateVoice(showVoicePicker, variation.content, v.value);
+                }}
+              >
+                <View style={styles.voiceOptionLeft}>
+                  <Ionicons name="mic-outline" size={20} color={THEME} />
+                  <View>
+                    <Text style={styles.voiceOptionName}>{v.label}</Text>
+                    <Text style={styles.voiceOptionDesc}>{v.desc}</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#CCC" />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.voicePickerCancel} onPress={() => setShowVoicePicker(null)}>
+              <Text style={styles.voicePickerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -277,42 +492,58 @@ export default function GenerateScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAFA' },
   header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-  title: { fontSize: 28, fontWeight: '800', color: '#1C1C1E' },
+  title: { fontSize: 24, fontWeight: '800', color: '#1C1C1E' },
   subtitle: { fontSize: 14, color: '#999', marginTop: 4 },
   label: { fontSize: 14, fontWeight: '600', color: '#555', marginTop: 16, marginBottom: 8, paddingHorizontal: 20 },
-  chipScroll: { paddingLeft: 20 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100, backgroundColor: THEME_LIGHT, marginRight: 8 },
+  chipScroll: { paddingLeft: 20, paddingRight: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 100, backgroundColor: THEME_LIGHT, marginRight: 8, gap: 6 },
   chipActive: { backgroundColor: THEME },
   chipText: { fontSize: 13, fontWeight: '600', color: THEME },
   chipTextActive: { color: 'white' },
-  chipTone: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100, backgroundColor: '#F0F0F0', marginRight: 8 },
-  chipToneActive: { backgroundColor: '#1C1C1E' },
+  chipTone: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 100, backgroundColor: '#F0F0F0', marginRight: 8 },
+  chipToneActive: { backgroundColor: '#333' },
   chipToneText: { fontSize: 13, fontWeight: '600', color: '#555' },
   chipToneTextActive: { color: 'white' },
-  promptInput: { marginHorizontal: 20, marginTop: 8, backgroundColor: 'white', borderRadius: 16, padding: 16, fontSize: 15, minHeight: 100, borderWidth: 1, borderColor: '#E5E5E5' },
-  generateBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: THEME, borderRadius: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  promptInput: { marginHorizontal: 20, marginTop: 8, backgroundColor: 'white', borderRadius: 16, padding: 16, fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#E5E5EA' },
+  generateBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: THEME, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16, gap: 8 },
   generateBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
-  errorBox: { marginHorizontal: 20, marginTop: 12, backgroundColor: '#FFF0F0', borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  errorBox: { marginHorizontal: 20, marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF3F3', padding: 16, borderRadius: 12 },
   errorText: { color: '#FF3B30', fontSize: 14, flex: 1 },
-  resultCard: { marginHorizontal: 20, marginTop: 16, backgroundColor: 'white', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#F0F0F0' },
+  resultCard: { marginHorizontal: 20, marginTop: 16, backgroundColor: 'white', borderRadius: 16, padding: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   resultBadge: { fontSize: 12, fontWeight: '700', color: THEME, backgroundColor: THEME_LIGHT, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100 },
-  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  copyText: { color: THEME, fontSize: 13, fontWeight: '600' },
-  resultContent: { fontSize: 14, color: '#333', lineHeight: 22 },
-  hashtagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  hashtag: { fontSize: 13, color: THEME, backgroundColor: THEME_LIGHT, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  wordCount: { fontSize: 12, color: '#999', marginTop: 8 },
-  consentOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  consentCard: { backgroundColor: 'white', borderRadius: 24, padding: 28, width: '100%', maxWidth: 360 },
-  consentIcon: { alignItems: 'center', marginBottom: 16 },
-  consentTitle: { fontSize: 20, fontWeight: '800', color: '#1C1C1E', textAlign: 'center', marginBottom: 12 },
-  consentBody: { fontSize: 14, color: '#555', lineHeight: 20, marginBottom: 10 },
-  consentLinks: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8, marginBottom: 20 },
-  consentLink: { color: THEME, fontSize: 13, fontWeight: '600' },
-  consentBtns: { flexDirection: 'row', gap: 12 },
-  consentDeclineBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#F0F0F0', alignItems: 'center' },
-  consentDeclineText: { color: '#666', fontWeight: '600', fontSize: 15 },
-  consentAcceptBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: THEME, alignItems: 'center' },
-  consentAcceptText: { color: 'white', fontWeight: '700', fontSize: 15 },
+  resultActions: { flexDirection: 'row', gap: 8 },
+  voiceBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: THEME_LIGHT, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 100 },
+  voiceBtnText: { fontSize: 12, fontWeight: '600', color: THEME },
+  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F0F0', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 100 },
+  copyText: { fontSize: 12, fontWeight: '600', color: '#555' },
+  resultContent: { fontSize: 15, color: '#1C1C1E', lineHeight: 22 },
+  hashtagsRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 },
+  hashtag: { fontSize: 13, color: THEME, fontWeight: '600' },
+  wordCount: { fontSize: 12, color: '#999', marginTop: 12 },
+  audioPlayer: { flexDirection: 'row', alignItems: 'center', marginTop: 16, backgroundColor: THEME_LIGHT, borderRadius: 12, padding: 12, gap: 12 },
+  playBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: THEME, justifyContent: 'center', alignItems: 'center' },
+  audioInfo: { flex: 1 },
+  audioVoiceText: { fontSize: 14, fontWeight: '600', color: '#1C1C1E' },
+  audioDurationText: { fontSize: 12, color: '#999', marginTop: 2 },
+  shareBtn: { padding: 8 },
+  consentOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
+  consentCard: { backgroundColor: 'white', borderRadius: 24, padding: 28, width: '100%', maxWidth: 360, alignItems: 'center' },
+  consentIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: THEME_LIGHT, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  consentTitle: { fontSize: 20, fontWeight: '700', color: '#1C1C1E', marginBottom: 12, textAlign: 'center' },
+  consentBody: { fontSize: 14, color: '#555', lineHeight: 20, textAlign: 'center', marginBottom: 24 },
+  consentButtons: { flexDirection: 'row', gap: 12, width: '100%' },
+  consentDeclineBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#F0F0F0', alignItems: 'center' },
+  consentDeclineText: { fontSize: 15, fontWeight: '600', color: '#555' },
+  consentAcceptBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: THEME, alignItems: 'center' },
+  consentAcceptText: { fontSize: 15, fontWeight: '700', color: 'white' },
+  voicePickerCard: { backgroundColor: 'white', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360 },
+  voicePickerTitle: { fontSize: 20, fontWeight: '700', color: '#1C1C1E', marginBottom: 4 },
+  voicePickerSubtitle: { fontSize: 14, color: '#999', marginBottom: 20 },
+  voiceOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  voiceOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  voiceOptionName: { fontSize: 16, fontWeight: '600', color: '#1C1C1E' },
+  voiceOptionDesc: { fontSize: 12, color: '#999', marginTop: 2 },
+  voicePickerCancel: { marginTop: 16, paddingVertical: 12, alignItems: 'center' },
+  voicePickerCancelText: { fontSize: 15, fontWeight: '600', color: '#999' },
 });

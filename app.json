@@ -1,49 +1,51 @@
 {
-  "expo": {
-    "name": "ContentAI Pro",
-    "slug": "contentai-pro",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#7C3AED",
-      "resizeMode": "contain",
-      "image": "./assets/splash.png"
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.aibusinessassistant.contentai",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "ContentAI Pro"
-      },
-      "buildNumber": "6"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#7C3AED"
-      },
-      "package": "com.aibusinessassistant.contentai",
-      "versionCode": 4
-    },
-    "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "f4ff5431-2f66-4424-ab90-d852f31a5f36"
-      }
-    },
-    "owner": "bc-canadian-usa-global-ventures-llc",
-    "plugins": [
-      "expo-font",
-      "expo-asset"
-    ]
-  }
+    "expo": {
+        "name": "ContentAI Pro",
+        "slug": "contentai-pro",
+        "version": "1.1.0",
+        "orientation": "portrait",
+        "icon": "./assets/icon.png",
+        "userInterfaceStyle": "light",
+        "splash": {
+            "backgroundColor": "#7C3AED",
+            "resizeMode": "contain",
+            "image": "./assets/splash.png"
+        },
+        "assetBundlePatterns": [
+            "**/*"
+        ],
+        "ios": {
+            "supportsTablet": true,
+            "bundleIdentifier": "com.aibusinessassistant.contentai",
+            "infoPlist": {
+                "ITSAppUsesNonExemptEncryption": false,
+                "CFBundleDisplayName": "ContentAI Pro"
+            },
+            "buildNumber": "59"
+        },
+        "android": {
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/adaptive-icon.png",
+                "backgroundColor": "#7C3AED"
+            },
+            "package": "com.aibusinessassistant.contentai",
+            "versionCode": 4
+        },
+        "web": {
+            "favicon": "./assets/favicon.png",
+            "bundler": "metro"
+        },
+        "extra": {
+            "eas": {
+                "projectId": "f4ff5431-2f66-4424-ab90-d852f31a5f36"
+            }
+        },
+        "owner": "bc-canadian-usa-global-ventures-llc",
+        "plugins": [
+            "expo-font",
+            "expo-asset",
+            "expo-av",
+            "expo-sharing"
+        ]
+    }
 }

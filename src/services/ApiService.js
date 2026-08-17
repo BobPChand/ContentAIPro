@@ -14,6 +14,20 @@ export async function generateContent(params) {
   }
 }
 
+export async function generateVoice(text, voice = 'nova') {
+  try {
+    const response = await fetch(`${API_BASE}/aiVoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice }),
+    });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 // Storage keys
 export const STORAGE_KEYS = {
   IS_SUBSCRIBED: 'contentai_subscribed',
@@ -22,6 +36,7 @@ export const STORAGE_KEYS = {
   SAVED_CONTENT: 'contentai_saved_content',
   USER_EMAIL: 'contentai_user_email',
   AI_CONSENT: 'contentai_ai_consent',
+  SAVED_AUDIO: 'contentai_saved_audio',
 };
 
 const FREE_TIER_LIMIT = 3;
@@ -40,7 +55,6 @@ export async function incrementGenerationsUsed() {
 }
 
 export async function isSubscribed() {
-  // Check RevenueCat first (receipt-verified)
   try {
     const Purchases = require('react-native-purchases').default;
     const customerInfo = await Purchases.getCustomerInfo();
@@ -51,7 +65,6 @@ export async function isSubscribed() {
   } catch (e) {
     console.log('RevenueCat check failed, falling back to local:', e);
   }
-  // Fallback to local cache
   const val = await AsyncStorage.getItem(STORAGE_KEYS.IS_SUBSCRIBED);
   return val === 'true';
 }
@@ -117,6 +130,25 @@ export async function getUserEmail() {
 
 export async function setUserEmail(email) {
   await AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, email);
+}
+
+export async function saveAudioRecord(record) {
+  const existing = await getSavedAudio();
+  const newRecord = { id: Date.now().toString(), ...record, savedAt: new Date().toISOString() };
+  const updated = [newRecord, ...existing].slice(0, 30);
+  await AsyncStorage.setItem(STORAGE_KEYS.SAVED_AUDIO, JSON.stringify(updated));
+  return newRecord;
+}
+
+export async function getSavedAudio() {
+  const val = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_AUDIO);
+  return val ? JSON.parse(val) : [];
+}
+
+export async function deleteSavedAudio(id) {
+  const existing = await getSavedAudio();
+  const updated = existing.filter(item => item.id !== id);
+  await AsyncStorage.setItem(STORAGE_KEYS.SAVED_AUDIO, JSON.stringify(updated));
 }
 
 export const FREE_LIMIT = FREE_TIER_LIMIT;
