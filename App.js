@@ -4,18 +4,45 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import HomeScreen from './src/screens/HomeScreen';
 import GenerateScreen from './src/screens/GenerateScreen';
 import BrandScreen from './src/screens/BrandScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import PaywallScreen from './src/screens/PaywallScreen';
+import OnboardingScreen, { APP_CONFIGS } from './src/components/OnboardingScreen';
+import { incrementSessionCount } from './src/utils/SmartRatingPrompt';
 
 const Tab = createBottomTabNavigator();
-
 const THEME_COLOR = '#7C3AED';
 
 export default function App() {
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
+  const [isReady, setIsReady] = React.useState(false);
+
+  React.useEffect(() => {
+    (async () => {
+      const done = await AsyncStorage.getItem('onboarding_completed');
+      if (!done) setShowOnboarding(true);
+      await incrementSessionCount();
+      setIsReady(true);
+    })();
+  }, []);
+
+  if (!isReady) return null;
+
+  if (showOnboarding) {
+    return (
+      <SafeAreaProvider>
+        <OnboardingScreen
+          appConfig={APP_CONFIGS.ContentAIPro}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      </SafeAreaProvider>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>

@@ -7,6 +7,7 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { generateContent, generateVoice, canGenerate, incrementGenerationsUsed, isSubscribed, getBrandProfile, saveContent, saveAudioRecord, hasAIConsent, setAIConsent } from '../services/ApiService';
+import VideoCreator from '../components/VideoCreator';
 
 const THEME = '#7C3AED';
 const THEME_LIGHT = '#F3EEFF';
@@ -69,6 +70,7 @@ export default function GenerateScreen({ route, navigation }) {
   const [audioState, setAudioState] = React.useState({});
   const [sound, setSound] = React.useState(null);
   const [playingId, setPlayingId] = React.useState(null);
+  const [showVideoCreator, setShowVideoCreator] = React.useState(null);
 
   React.useEffect(() => {
     return () => {
@@ -166,13 +168,11 @@ export default function GenerateScreen({ route, navigation }) {
     setVoiceLoading(variationId);
 
     try {
-      // Strip hashtags and clean text for TTS
       const cleanText = text.replace(/#[\w]+/g, '').replace(/\n{3,}/g, '\n\n').trim();
 
       const result = await generateVoice(cleanText, voice);
 
       if (result.success && result.data?.audio) {
-        // Save audio to file system
         const fileName = `voice_${Date.now()}.mp3`;
         const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
 
@@ -182,7 +182,13 @@ export default function GenerateScreen({ route, navigation }) {
 
         setAudioState(prev => ({
           ...prev,
-          [variationId]: { fileUri, voice: result.data.voice, duration: result.data.duration_estimate }
+          [variationId]: { 
+            fileUri, 
+            voice: result.data.voice, 
+            duration: result.data.duration_estimate,
+            audioBase64: result.data.audio,
+            cleanText: cleanText
+          }
         }));
 
         await saveAudioRecord({
@@ -192,7 +198,6 @@ export default function GenerateScreen({ route, navigation }) {
           contentType,
         });
 
-        // Auto-play the audio
         await playAudio(variationId, fileUri);
       } else {
         Alert.alert('Voice generation failed', result.error || 'Please try again.');
@@ -206,7 +211,6 @@ export default function GenerateScreen({ route, navigation }) {
 
   const playAudio = async (variationId, fileUri) => {
     try {
-      // Stop existing audio
       if (sound) {
         await sound.unloadAsync();
       }
@@ -260,6 +264,87 @@ export default function GenerateScreen({ route, navigation }) {
     }
   };
 
+  // Split content into video scenes
+  const getScenesFromContent = (content) => {
+    // Split by [Scene markers or by double newlines
+    let scenes = [];
+    
+    // Try to split by [Scene: ...] markers
+    if (content.includes('[Scene') || content.includes('[scene')) {
+      const parts = content.split(/\[Scene[^\]]*\]/i).filter(s => s.trim());
+      // Also extract voiceover text
+      for (const part of parts) {
+        const voMatch = part.match(/\[Voiceover\]?:?\s*"([^"]+)"/i) || part.match(/\[Voiceover\]?:?\s*(.+?)(?:\n|$)/i);
+        if (voMatch) {
+          scenes.push(voMatch[1].trim());
+        } else {
+          // Use the text without on-screen markers
+          const cleaned = part
+            .replace(/\[On-Screen[^]]*\]/gi, '')
+            .replace(/\[Voiceover[^\]]*\]/gi, '')
+            .replace(/\[End Screen[^\]]*\]/gi, '')
+            .replace(/[🎬📸🎥🎬]/g, '')
+            .trim();
+          if (cleaned) scenes.push(cleaned);
+        }
+      }
+    }
+    
+    // Fallback: split by paragraphs
+    if (scenes.length < 2) {
+      scenes = content
+        .replace(/#[\w]+/g, '')
+        .replace(/\[Scene[^\]]*\]/gi, '')
+        .replace(/\[On-Screen[^\]]*\]/gi, '')
+        .replace(/\[Voiceover\]?:?/gi, '')
+        .replace(/\[End Screen[^\]]*\]/gi, '')
+        .split(/\n\n+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 5)
+        .slice(0, 8);
+    }
+    
+    // If still too few, split by sentences
+    if (scenes.length < 2) {
+      scenes = content
+        .replace(/#[\w]+/g, '')
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 5)
+        .slice(0, 8);
+    }
+    
+    // Limit each scene to ~150 chars for display
+    scenes = scenes.map(s => {
+      if (s.length > 150) {
+        return s.slice(0, 147) + '...';
+      }
+      return s;
+    });
+    
+    return scenes.slice(0, 8); // Max 8 scenes
+  };
+
+  const handleCreateVideo = (variationId, variation) => {
+    const audio = audioState[variationId];
+    if (!audio || !audio.audioBase64) {
+      Alert.alert('Generate voice first', 'Please generate a voice over before creating a video.');
+      return;
+    }
+
+    const scenes = getScenesFromContent(variation.content);
+    if (scenes.length < 1) {
+      Alert.alert('No content', 'Cannot extract scenes from the content.');
+      return;
+    }
+
+    setShowVideoCreator({
+      scenes,
+      audioBase64: audio.audioBase64,
+      brandName: '', // Could fetch from brand profile
+    });
+  };
+
   const isVideoOrVoice = contentType === 'video_script' || contentType === 'voice_over';
 
   return (
@@ -268,7 +353,7 @@ export default function GenerateScreen({ route, navigation }) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
           <View style={styles.header}>
             <Text style={styles.title}>Generate Content</Text>
-            <Text style={styles.subtitle}>Text, video scripts & voice — AI does it all</Text>
+            <Text style={styles.subtitle}>Text, scripts, voice & video — AI does it all</Text>
           </View>
 
           {/* Content Type Selector */}
@@ -386,7 +471,7 @@ export default function GenerateScreen({ route, navigation }) {
                       )}
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => copyContent(variation.content)} style={styles.copyBtn}>
-                      <Ionicons name="copy-outline" size={16} color={THEME} />
+                      <Ionicons name="copy-outline" size={16} color="#555" />
                       <Text style={styles.copyText}>Copy</Text>
                     </TouchableOpacity>
                   </View>
@@ -417,13 +502,21 @@ export default function GenerateScreen({ route, navigation }) {
                       <Text style={styles.audioVoiceText}>Voice: {hasAudio.voice}</Text>
                       <Text style={styles.audioDurationText}>~{hasAudio.duration}s</Text>
                     </View>
-                    <TouchableOpacity
-                      style={styles.shareBtn}
-                      onPress={() => shareAudio(hasAudio.fileUri)}
-                    >
+                    <TouchableOpacity style={styles.shareBtn} onPress={() => shareAudio(hasAudio.fileUri)}>
                       <Ionicons name="share-outline" size={18} color={THEME} />
                     </TouchableOpacity>
                   </View>
+                )}
+
+                {/* Create Video Button - shows after voice is generated */}
+                {hasAudio && (
+                  <TouchableOpacity
+                    style={styles.createVideoBtn}
+                    onPress={() => handleCreateVideo(vId, variation)}
+                  >
+                    <Ionicons name="videocam" size={18} color="white" />
+                    <Text style={styles.createVideoBtnText}>Create Video</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             );
@@ -485,6 +578,17 @@ export default function GenerateScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Video Creator Modal */}
+      {showVideoCreator && (
+        <VideoCreator
+          visible={true}
+          onClose={() => setShowVideoCreator(null)}
+          scenes={showVideoCreator.scenes}
+          audioBase64={showVideoCreator.audioBase64}
+          brandName={showVideoCreator.brandName}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -527,6 +631,8 @@ const styles = StyleSheet.create({
   audioVoiceText: { fontSize: 14, fontWeight: '600', color: '#1C1C1E' },
   audioDurationText: { fontSize: 12, color: '#999', marginTop: 2 },
   shareBtn: { padding: 8 },
+  createVideoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, backgroundColor: '#1C1C1E', paddingVertical: 14, borderRadius: 12 },
+  createVideoBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
   consentOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
   consentCard: { backgroundColor: 'white', borderRadius: 24, padding: 28, width: '100%', maxWidth: 360, alignItems: 'center' },
   consentIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: THEME_LIGHT, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
