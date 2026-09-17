@@ -36,7 +36,9 @@
     "react-native-webview": "^13.13.5",
     "expo-store-review": "latest",
     "expo-notifications": "latest",
-    "expo-haptics": "latest"
+    "expo-haptics": "latest",
+    "expo-image-picker": "~16.1.2",
+    "expo-image-manipulator": "~13.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0"

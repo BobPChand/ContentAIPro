@@ -11,6 +11,7 @@ import GenerateScreen from './src/screens/GenerateScreen';
 import BrandScreen from './src/screens/BrandScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import PaywallScreen from './src/screens/PaywallScreen';
+import MotionVideoScreen from './src/screens/MotionVideoScreen';
 import OnboardingScreen, { APP_CONFIGS } from './src/components/OnboardingScreen';
 import { incrementSessionCount } from './src/utils/SmartRatingPrompt';
 
@@ -56,6 +57,7 @@ export default function App() {
               else if (route.name === 'Brand') iconName = focused ? 'business' : 'business-outline';
               else if (route.name === 'History') iconName = focused ? 'time' : 'time-outline';
               else if (route.name === 'Upgrade') iconName = focused ? 'rocket' : 'rocket-outline';
+              else if (route.name === 'Motion') iconName = focused ? 'videocam' : 'videocam-outline';
               return <Ionicons name={iconName} size={size} color={color} />;
             },
             tabBarActiveTintColor: THEME_COLOR,
